@@ -3,12 +3,13 @@
 -export(?API).
 
 find_executable() -> os:find_executable("inotifywait").
-known_events() -> [renamed, closed, modified, isdir, undefined].
+known_events() -> [created, deleted, renamed, closed, modified, isdir, attribute, undefined].
 
 start_port(Path, Cwd) ->
     Path1 = filename:absname(Path),
     Args = ["-c", "inotifywait $0 $@ & PID=$!; read a; kill $PID",
-            "-m", "-e", "close_write", "-e", "moved_to", "-e", "create", "-r", Path1],
+            "-m", "-e", "modify", "-e", "close_write", "-e", "moved_to", "-e", "create", "-e", "delete",
+            "-e", "attrib", "--quiet", "-r", Path1],
     erlang:open_port({spawn_executable, os:find_executable("sh")},
         [stream, exit_status, {line, 16384}, {args, Args}, {cd, Cwd}]).
 
@@ -18,11 +19,14 @@ line_to_event(Line) ->
     Path = Dir ++ DirEntry,
     {Path, Flags}.
 
-%convert_flag("CREATE") -> created;
+convert_flag("CREATE") -> created;
+convert_flag("DELETE") -> deleted;
 convert_flag("ISDIR") -> isdir;
+convert_flag("MODIFY") -> modified;
 convert_flag("CLOSE_WRITE") -> modified;
 convert_flag("CLOSE") -> closed;
 convert_flag("MOVED_TO") -> renamed;
+convert_flag("ATTRIB") -> attribute;
 convert_flag(_) -> undefined.
 
 re() ->
@@ -33,4 +37,3 @@ re() ->
             R;
         V -> V
     end.
-
